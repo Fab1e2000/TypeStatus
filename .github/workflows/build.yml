@@ -1,0 +1,41 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-x64:
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake --preset vs2022-x64
+
+      - name: Build
+        run: cmake --build --preset release
+
+      - name: Stage artifact
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Copy-Item build/vs2022-x64/Release/TypeStatus.exe dist/TypeStatus.exe
+          Copy-Item LICENSE dist/LICENSE.txt
+          Copy-Item docs/用户指南.md dist/用户指南.md
+          Compress-Archive -Path dist/* -DestinationPath TypeStatus-windows-x64.zip
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: TypeStatus-windows-x64
+          path: TypeStatus-windows-x64.zip

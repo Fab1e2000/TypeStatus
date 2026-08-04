@@ -1,0 +1,15 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "TypeStatus (Debug)",
+      "type": "cppvsdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}\\build\\vs2022-x64\\Debug\\TypeStatus.exe",
+      "cwd": "${workspaceFolder}",
+      "preLaunchTask": "CMake: Build Debug",
+      "stopAtEntry": false,
+      "externalConsole": false
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+# Build outputs
+/build/
+/out/
+/dist/
+/.vs/
+/CMakeUserPresets.json
+
+# IDE and compiler artifacts
+*.user
+*.suo
+*.VC.db
+*.VC.VC.opendb
+*.obj
+*.pdb
+*.ilk
+*.exe
+
+# Local diagnostics
+/ime-cursor-resources-*.csv
+
+# OS files
+Thumbs.db
+Desktop.ini
