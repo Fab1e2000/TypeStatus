@@ -17,7 +17,7 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Configure
         run: cmake --preset vs2022-x64
@@ -35,7 +35,7 @@ jobs:
           Compress-Archive -Path dist/* -DestinationPath TypeStatus-windows-x64.zip
 
       - name: Upload build artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: TypeStatus-windows-x64
           path: TypeStatus-windows-x64.zip
