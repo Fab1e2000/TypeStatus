@@ -1,4 +1,5 @@
 #include "app.h"
+#include "resource.h"
 
 #include <strsafe.h>
 
@@ -45,7 +46,8 @@ int App::Run(HINSTANCE instance, int /*show_command*/) {
     window_class.cbSize = sizeof(window_class);
     window_class.lpfnWndProc = WindowProcedure;
     window_class.hInstance = instance_;
-    window_class.hIcon = LoadIconW(nullptr, IDI_APPLICATION);
+    window_class.hIcon = LoadIconW(instance_, MAKEINTRESOURCEW(IDI_TYPESTATUS));
+    window_class.hIconSm = LoadIconW(instance_, MAKEINTRESOURCEW(IDI_TYPESTATUS));
     window_class.hCursor = LoadCursorW(nullptr, IDC_ARROW);
     window_class.lpszClassName = kWindowClassName;
 
@@ -266,7 +268,7 @@ bool App::AddTrayIcon() {
     icon_data.uID = kTrayIconId;
     icon_data.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP | NIF_SHOWTIP;
     icon_data.uCallbackMessage = kTrayCallbackMessage;
-    icon_data.hIcon = LoadIconW(nullptr, IDI_APPLICATION);
+    icon_data.hIcon = LoadIconW(instance_, MAKEINTRESOURCEW(IDI_TYPESTATUS));
     StringCchCopyW(
         icon_data.szTip,
         ARRAYSIZE(icon_data.szTip),

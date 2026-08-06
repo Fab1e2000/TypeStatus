@@ -7,6 +7,8 @@ if(NOT WIN32)
 endif()
 
 add_executable(TypeStatus WIN32
+    resources/app-icon.ico
+    resources/app-icon.svg
     src/app.cpp
     src/app.h
     src/cursor_renderer.cpp
