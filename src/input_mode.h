@@ -23,6 +23,17 @@ public:
     [[nodiscard]] InputModeSample Sample(DWORD message_timeout_ms = 100) const noexcept;
 };
 
+namespace detail {
+
+[[nodiscard]] InputMode DetermineInputMode(
+    LANGID language_id,
+    bool open_status_succeeded,
+    DWORD_PTR open_status,
+    bool conversion_mode_succeeded,
+    DWORD_PTR conversion_mode) noexcept;
+
+}  // namespace detail
+
 [[nodiscard]] const wchar_t* InputModeName(InputMode mode) noexcept;
 
 }  // namespace typestatus

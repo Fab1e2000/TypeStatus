@@ -13,13 +13,25 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+public static class TypeStatusGuiResources {
+    [DllImport("user32.dll")]
+    public static extern uint GetGuiResources(IntPtr process, uint flags);
+}
+'@
+
 function Find-ImeCursorProcess {
     $candidates = @(
         Get-CimInstance Win32_Process |
             Where-Object {
                 $_.ProcessId -ne $PID -and
                 (
-                    $_.Name -eq 'TypeStatus.exe' -or
+                    (
+                        $_.Name -eq 'TypeStatus.exe' -and
+                        $_.CommandLine -notmatch '--watchdog'
+                    ) -or
                     (
                         ($_.Name -eq 'powershell.exe' -or $_.Name -eq 'pwsh.exe') -and
                         $_.CommandLine -and
@@ -103,16 +115,20 @@ while ([DateTime]::UtcNow -lt $stopAt) {
             WorkingSetBytes    = $target.WorkingSet64
             PrivateMemoryBytes = $target.PrivateMemorySize64
             HandleCount        = $target.HandleCount
+            GdiObjectCount     = [TypeStatusGuiResources]::GetGuiResources($target.Handle, 0)
+            UserObjectCount    = [TypeStatusGuiResources]::GetGuiResources($target.Handle, 1)
             ThreadCount        = $target.Threads.Count
         }
 
         $samples.Add($sample)
-        Write-Host ('{0:HH:mm:ss}  CPU={1,7:N4}%  WS={2,7:N2} MB  Private={3,7:N2} MB  Handles={4}  Threads={5}' -f
+        Write-Host ('{0:HH:mm:ss}  CPU={1,7:N4}%  WS={2,7:N2} MB  Private={3,7:N2} MB  Handles={4}  GDI={5}  USER={6}  Threads={7}' -f
             (Get-Date),
             $sample.CpuPercent,
             ($sample.WorkingSetBytes / 1MB),
             ($sample.PrivateMemoryBytes / 1MB),
             $sample.HandleCount,
+            $sample.GdiObjectCount,
+            $sample.UserObjectCount,
             $sample.ThreadCount)
 
         $previousCpuSeconds = $currentCpuSeconds
@@ -134,6 +150,8 @@ $cpuStats = $samples | Measure-Object -Property CpuPercent -Average -Maximum
 $workingSetStats = $samples | Measure-Object -Property WorkingSetBytes -Average -Maximum
 $privateStats = $samples | Measure-Object -Property PrivateMemoryBytes -Average -Maximum
 $handleStats = $samples | Measure-Object -Property HandleCount -Minimum -Maximum
+$gdiStats = $samples | Measure-Object -Property GdiObjectCount -Minimum -Maximum
+$userStats = $samples | Measure-Object -Property UserObjectCount -Minimum -Maximum
 
 Write-Host ''
 Write-Host 'Summary' -ForegroundColor Green
@@ -149,4 +167,10 @@ Write-Host ('  Private mem: avg={0:N2} MB  max={1:N2} MB' -f
 Write-Host ('  Handles:     min={0}  max={1}' -f
     $handleStats.Minimum,
     $handleStats.Maximum)
+Write-Host ('  GDI objects: min={0}  max={1}' -f
+    $gdiStats.Minimum,
+    $gdiStats.Maximum)
+Write-Host ('  USER objects: min={0}  max={1}' -f
+    $userStats.Minimum,
+    $userStats.Maximum)
 Write-Host ('  CSV:         {0}' -f ([IO.Path]::GetFullPath($LogPath)))

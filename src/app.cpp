@@ -1,5 +1,6 @@
 #include "app.h"
 #include "resource.h"
+#include "startup_manager.h"
 
 #include <strsafe.h>
 
@@ -160,6 +161,19 @@ LRESULT App::HandleMessage(
                     }
                     UpdateTrayTooltip();
                     return 0;
+                case kCommandStartup: {
+                    std::wstring error_message;
+                    if (!SetStartupEnabled(
+                            GetStartupState() != StartupState::enabled,
+                            error_message)) {
+                        MessageBoxW(
+                            window_,
+                            error_message.c_str(),
+                            kAppName,
+                            MB_OK | MB_ICONERROR);
+                    }
+                    return 0;
+                }
                 case kCommandExit:
                     DestroyWindow(window_);
                     return 0;
@@ -334,6 +348,18 @@ void App::ShowTrayMenu() {
         MF_STRING,
         kCommandRestore,
         paused_ ? L"继续状态着色" : L"暂停并恢复系统光标");
+    const StartupState startup_state = GetStartupState();
+    AppendMenuW(
+        menu,
+        MF_STRING |
+            (startup_state == StartupState::enabled
+                ? MF_CHECKED
+                : MF_UNCHECKED),
+        kCommandStartup,
+        startup_state == StartupState::stale
+            ? L"修复开机自动启动"
+            : L"开机自动启动");
+    AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(menu, MF_STRING, kCommandExit, L"退出");
 
     SetForegroundWindow(window_);
@@ -352,7 +378,7 @@ void App::ShowTrayMenu() {
 void App::ShowAbout() const {
     MessageBoxW(
         window_,
-        L"TypeStatus MVP\n\n"
+        L"TypeStatus 1.0.0\n\n"
         L"中文输入：红色光标\n"
         L"英文输入：蓝色光标\n"
         L"无法识别：系统默认光标\n\n"

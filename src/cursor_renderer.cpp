@@ -1,4 +1,5 @@
 #include "cursor_renderer.h"
+#include "color_math.h"
 
 #include <objidl.h>
 #include <gdiplus.h>
@@ -194,26 +195,17 @@ Gdiplus::Color RecoverSourceColor(
         recover(on_black.GetB()));
 }
 
-Gdiplus::Color TintByLuminance(
+Gdiplus::Color CreateTintedColor(
     const Gdiplus::Color& source,
     const Gdiplus::Color& target) noexcept {
-    const int luminance =
-        (source.GetR() * 2126 +
-         source.GetG() * 7152 +
-         source.GetB() * 722) /
-        10000;
-
-    const auto tint_channel = [luminance](BYTE target_channel) {
-        const int distance_to_white = 255 - target_channel;
-        return static_cast<BYTE>(
-            target_channel + (distance_to_white * luminance + 127) / 255);
-    };
-
+    const RgbColor tinted = TintByLuminance(
+        {source.GetR(), source.GetG(), source.GetB()},
+        {target.GetR(), target.GetG(), target.GetB()});
     return Gdiplus::Color(
         255,
-        tint_channel(target.GetR()),
-        tint_channel(target.GetG()),
-        tint_channel(target.GetB()));
+        tinted.red,
+        tinted.green,
+        tinted.blue);
 }
 
 HCURSOR CreateColorVariant(
@@ -277,7 +269,7 @@ HCURSOR CreateColorVariant(
                 !preserve_source_luminance ||
                 IsInvertedPixel(black_pixel, white_pixel)
                 ? target_color
-                : TintByLuminance(
+                : CreateTintedColor(
                       RecoverSourceColor(black_pixel, coverage),
                       target_color);
 

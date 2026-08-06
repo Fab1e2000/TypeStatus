@@ -38,6 +38,26 @@ ImeQueryResult QueryImeControl(
 
 }  // namespace
 
+InputMode detail::DetermineInputMode(
+    LANGID language_id,
+    bool open_status_succeeded,
+    DWORD_PTR open_status,
+    bool conversion_mode_succeeded,
+    DWORD_PTR conversion_mode) noexcept {
+    if (PRIMARYLANGID(language_id) == LANG_ENGLISH) {
+        return InputMode::english;
+    }
+    if (open_status_succeeded && open_status == 0) {
+        return InputMode::english;
+    }
+    if (!conversion_mode_succeeded) {
+        return InputMode::unknown;
+    }
+    return (conversion_mode & kImeNativeMode) != 0
+        ? InputMode::chinese
+        : InputMode::english;
+}
+
 InputModeSample InputModeDetector::Sample(DWORD message_timeout_ms) const noexcept {
     InputModeSample sample;
 
@@ -81,7 +101,12 @@ InputModeSample InputModeDetector::Sample(DWORD message_timeout_ms) const noexce
     const auto raw_layout = reinterpret_cast<ULONG_PTR>(sample.keyboard_layout);
     const LANGID language_id = LOWORD(raw_layout);
     if (PRIMARYLANGID(language_id) == LANG_ENGLISH) {
-        sample.mode = InputMode::english;
+        sample.mode = detail::DetermineInputMode(
+            language_id,
+            false,
+            0,
+            false,
+            0);
         sample.reason = L"English-family keyboard layout";
         return sample;
     }
@@ -96,7 +121,12 @@ InputModeSample InputModeDetector::Sample(DWORD message_timeout_ms) const noexce
         kGetOpenStatus,
         message_timeout_ms);
     if (open_status.succeeded && open_status.value == 0) {
-        sample.mode = InputMode::english;
+        sample.mode = detail::DetermineInputMode(
+            language_id,
+            open_status.succeeded,
+            open_status.value,
+            false,
+            0);
         sample.reason = L"IME reports closed";
         return sample;
     }
@@ -105,12 +135,15 @@ InputModeSample InputModeDetector::Sample(DWORD message_timeout_ms) const noexce
         ime_window,
         kGetConversionMode,
         message_timeout_ms);
-    if (conversion_mode.succeeded &&
-        (conversion_mode.value & kImeNativeMode) != 0) {
-        sample.mode = InputMode::chinese;
+    sample.mode = detail::DetermineInputMode(
+        language_id,
+        open_status.succeeded,
+        open_status.value,
+        conversion_mode.succeeded,
+        conversion_mode.value);
+    if (sample.mode == InputMode::chinese) {
         sample.reason = L"IME native conversion mode is enabled";
-    } else if (conversion_mode.succeeded) {
-        sample.mode = InputMode::english;
+    } else if (sample.mode == InputMode::english) {
         sample.reason = L"IME native conversion mode is disabled";
     } else {
         sample.reason = L"IME status query failed";

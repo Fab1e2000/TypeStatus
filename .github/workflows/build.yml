@@ -14,6 +14,9 @@ permissions:
 jobs:
   windows-x64:
     runs-on: windows-2022
+    env:
+      SIGNING_CERTIFICATE_BASE64: ${{ secrets.SIGNING_CERTIFICATE_BASE64 }}
+      TYPESTATUS_SIGNING_PASSWORD: ${{ secrets.TYPESTATUS_SIGNING_PASSWORD }}
 
     steps:
       - name: Check out repository
@@ -25,17 +28,37 @@ jobs:
       - name: Build
         run: cmake --build --preset release
 
-      - name: Stage artifact
+      - name: Test
+        run: ctest --test-dir build/vs2022-x64 -C Release --output-on-failure
+
+      - name: Sign executable
+        if: ${{ env.SIGNING_CERTIFICATE_BASE64 != '' }}
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path dist | Out-Null
-          Copy-Item build/vs2022-x64/Release/TypeStatus.exe dist/TypeStatus.exe
-          Copy-Item LICENSE dist/LICENSE.txt
-          Copy-Item docs/用户指南.md dist/用户指南.md
-          Compress-Archive -Path dist/* -DestinationPath TypeStatus-windows-x64.zip
+          $certificatePath = Join-Path $env:RUNNER_TEMP 'typestatus-signing.pfx'
+          try {
+            [IO.File]::WriteAllBytes(
+              $certificatePath,
+              [Convert]::FromBase64String($env:SIGNING_CERTIFICATE_BASE64))
+            ./scripts/sign-release.ps1 `
+              -ExecutablePath build/vs2022-x64/Release/TypeStatus.exe `
+              -CertificatePath $certificatePath
+          }
+          finally {
+            Remove-Item -LiteralPath $certificatePath -Force -ErrorAction SilentlyContinue
+          }
+
+      - name: Package artifact
+        shell: pwsh
+        run: |
+          ./scripts/package-release.ps1 `
+            -ExecutablePath build/vs2022-x64/Release/TypeStatus.exe `
+            -OutputDirectory dist/package
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v7
         with:
           name: TypeStatus-windows-x64
-          path: TypeStatus-windows-x64.zip
+          path: |
+            dist/package/TypeStatus-windows-x64.zip
+            dist/package/TypeStatus-windows-x64.zip.sha256

@@ -23,7 +23,8 @@ private:
     static constexpr UINT kTrayCallbackMessage = WM_APP + 1;
     static constexpr UINT kTrayIconId = 1;
     static constexpr UINT kCommandRestore = 1001;
-    static constexpr UINT kCommandExit = 1002;
+    static constexpr UINT kCommandStartup = 1002;
+    static constexpr UINT kCommandExit = 1003;
 
     HINSTANCE instance_ = nullptr;
     HWND window_ = nullptr;
