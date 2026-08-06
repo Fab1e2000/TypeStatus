@@ -15,7 +15,9 @@ namespace {
 constexpr UINT kSystemArrowId = 32512;
 constexpr UINT kSystemIBeamId = 32513;
 constexpr UINT kRestoreSystemCursors = 0x0057;
-constexpr int kDarkPixelLuminanceThreshold = 96;
+
+const Gdiplus::Color kChineseCursorColor(255, 229, 72, 77);
+const Gdiplus::Color kEnglishCursorColor(255, 59, 130, 246);
 
 class BitmapHandle {
 public:
@@ -167,6 +169,14 @@ int GetCoverage(
     return std::clamp(255 - transmission, 0, 255);
 }
 
+bool IsInvertedPixel(
+    const Gdiplus::Color& on_black,
+    const Gdiplus::Color& on_white) noexcept {
+    return on_white.GetR() < on_black.GetR() ||
+           on_white.GetG() < on_black.GetG() ||
+           on_white.GetB() < on_black.GetB();
+}
+
 Gdiplus::Color RecoverSourceColor(
     const Gdiplus::Color& on_black,
     int coverage) noexcept {
@@ -184,10 +194,32 @@ Gdiplus::Color RecoverSourceColor(
         recover(on_black.GetB()));
 }
 
+Gdiplus::Color TintByLuminance(
+    const Gdiplus::Color& source,
+    const Gdiplus::Color& target) noexcept {
+    const int luminance =
+        (source.GetR() * 2126 +
+         source.GetG() * 7152 +
+         source.GetB() * 722) /
+        10000;
+
+    const auto tint_channel = [luminance](BYTE target_channel) {
+        const int distance_to_white = 255 - target_channel;
+        return static_cast<BYTE>(
+            target_channel + (distance_to_white * luminance + 127) / 255);
+    };
+
+    return Gdiplus::Color(
+        255,
+        tint_channel(target.GetR()),
+        tint_channel(target.GetG()),
+        tint_channel(target.GetB()));
+}
+
 HCURSOR CreateColorVariant(
     HCURSOR source,
     const Gdiplus::Color& target_color,
-    bool replace_dark_pixels_only) {
+    bool preserve_source_luminance) {
     ICONINFO source_info{};
     if (GetIconInfo(source, &source_info) == FALSE) {
         throw Win32Failure("GetIconInfo");
@@ -241,20 +273,13 @@ HCURSOR CreateColorVariant(
             CheckStatus("Bitmap::GetPixel (white)", on_white.GetPixel(x, y, &white_pixel));
 
             const int coverage = GetCoverage(black_pixel, white_pixel);
-            Gdiplus::Color output = target_color;
-            if (replace_dark_pixels_only && coverage > 0) {
-                const Gdiplus::Color source_color_value = RecoverSourceColor(
-                    black_pixel,
-                    coverage);
-                const int luminance =
-                    (source_color_value.GetR() * 2126 +
-                     source_color_value.GetG() * 7152 +
-                     source_color_value.GetB() * 722) /
-                    10000;
-                if (luminance > kDarkPixelLuminanceThreshold) {
-                    output = source_color_value;
-                }
-            }
+            const Gdiplus::Color output =
+                !preserve_source_luminance ||
+                IsInvertedPixel(black_pixel, white_pixel)
+                ? target_color
+                : TintByLuminance(
+                      RecoverSourceColor(black_pixel, coverage),
+                      target_color);
 
             const Gdiplus::Color pixel(
                 static_cast<BYTE>(coverage),
@@ -341,19 +366,19 @@ bool CursorRenderer::Initialize(std::wstring& error_message) noexcept {
 
         chinese_ibeam_ = CreateColorVariant(
             source_ibeam,
-            Gdiplus::Color(255, 255, 0, 0),
+            kChineseCursorColor,
             false);
         english_ibeam_ = CreateColorVariant(
             source_ibeam,
-            Gdiplus::Color(255, 0, 0, 255),
+            kEnglishCursorColor,
             false);
         chinese_arrow_ = CreateColorVariant(
             source_arrow,
-            Gdiplus::Color(255, 255, 0, 0),
+            kChineseCursorColor,
             true);
         english_arrow_ = CreateColorVariant(
             source_arrow,
-            Gdiplus::Color(255, 0, 0, 255),
+            kEnglishCursorColor,
             true);
         return true;
     } catch (const std::exception& error) {
